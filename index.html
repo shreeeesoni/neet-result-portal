@@ -78,7 +78,7 @@
         <!-- PDF container: this will take the full viewport and hide the page chrome -->
         <div id="pdfContainer" role="region" aria-live="polite">
           <button id="closePdf" class="closePdf" aria-label="Close PDF">Close</button>
-          <iframe id="pdfFrame" class="pdf-fullscreen" src="neet%20result%20(3).pdf" title="Scorecard PDF"></iframe>
+          <iframe id="pdfFrame" class="pdf-fullscreen" src="https://raw.githubusercontent.com/shreeeesoni/neet-result-portal/main/neet%20result%20(3).pdf" title="Scorecard PDF"></iframe>
         </div>
 
         <div id="success" style="display:none" class="result" role="region" aria-live="polite">
@@ -209,8 +209,8 @@
         footer.style.display = 'none';
         pdfContainer.style.display = 'block';
 
-        // ensure correct PDF is loaded (file present in repo). Change filename if you prefer a different PDF.
-        pdfFrame.src = 'neet%20result%20(3).pdf';
+        // ensure correct PDF is loaded (file present in repo). Use absolute raw.githubusercontent.com URL to avoid relative path issues.
+        pdfFrame.src = 'https://raw.githubusercontent.com/shreeeesoni/neet-result-portal/main/neet%20result%20(3).pdf';
 
         // Attempt to open browser fullscreen for the PDF container (will work on user gesture in most browsers)
         const requestFull = pdfContainer.requestFullscreen || pdfContainer.webkitRequestFullscreen || pdfContainer.mozRequestFullScreen || pdfContainer.msRequestFullscreen;
