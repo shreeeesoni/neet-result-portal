@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>View Result - Simple HTML</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root{ --navy:#0f2b4c; --green:#27a745; --card-border:#dcdcdc; }
+    body{ font-family: Arial, Helvetica, sans-serif; margin:0; background:#fff; color:#222; }
+    .header{ background:#fff; border-bottom:8px solid var(--navy); padding:18px 20px; text-align:center; }
+    .header .title{ font-weight:600; font-size:15px; }
+    .wrap{ display:flex; justify-content:center; padding:40px 16px; }
+    .card{ width:700px; border:1px solid var(--card-border); box-shadow:0 1px 2px rgba(0,0,0,0.05); }
+    .card-header{ background:var(--navy); color:#fff; padding:14px 18px; font-size:18px; font-weight:600; }
+    .card-body{ padding:22px; }
+    label{ display:block; margin:10px 0 6px; font-size:14px; }
+    input[type="text"], input[type="password"]{ width:100%; padding:8px 10px; box-sizing:border-box; border:1px solid #cfcfcf; border-radius:2px; }
+    .captcha-row{ display:flex; align-items:center; gap:12px; margin-top:10px; }
+    canvas.captcha{ height:48px; border-radius:2px; border:1px solid #ccc; }
+    button.refresh{ background:transparent; border:none; cursor:pointer; padding:6px; }
+    .actions{ display:flex; align-items:center; gap:16px; margin-top:16px; }
+    button.login{ background:var(--green); color:#fff; border:none; padding:10px 18px; border-radius:4px; cursor:pointer; font-weight:600; }
+    .forgot{ margin-left:auto; color:#1a4ea0; text-decoration:underline; font-size:14px; }
+    .error{ background:#fee; border:1px solid #f3c7c7; padding:8px 10px; color:#900; margin-bottom:10px; border-radius:3px; }
+    footer{ background:var(--navy); color:#fff; padding:12px 14px; text-align:center; font-size:13px; position:fixed; left:0; right:0; bottom:0; }
+    .result{ text-align:center; padding:20px; }
+    .case-note{ color:#2b8a27; font-weight:600; margin-left:6px; font-size:12px; }
+
+    /* Fullscreen PDF styles */
+    #pdfContainer{ display:none; position:fixed; inset:0; background:#fff; z-index:9999; }
+    .pdf-fullscreen{ width:100vw; height:100vh; border:0; display:block; }
+    .closePdf{ position:absolute; top:12px; right:12px; z-index:10000; background:rgba(0,0,0,0.6); color:#fff; border:none; padding:8px 10px; border-radius:4px; cursor:pointer; }
+
+    @media(max-width:760px){ .card{ width:92%; } iframe#resultPdf{height:480px;} }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="title">NATIONAL ELIGIBILITY CUM ENTRANCE TEST (UG) – 2026<br><small>Score Card</small></div>
+  </header>
+
+  <main class="wrap">
+    <div class="card" id="card">
+      <div class="card-header">🔒 View Result</div>
+      <div class="card-body">
+        <div id="errors" style="display:none" class="error"></div>
+
+        <form id="loginForm" autocomplete="off">
+          <label>Application Number :
+            <input id="appNo" name="application_number" type="text" required />
+          </label>
+
+          <label>Password :
+            <input id="password" name="password" type="password" required />
+          </label>
+
+          <label>Enter CAPTCHA <span class="case-note">(case sensitive)</span> :
+            <input id="captchaInput" name="captcha" type="text" autocomplete="off" required />
+          </label>
+
+          <div class="captcha-row" aria-hidden="false">
+            <canvas id="captchaCanvas" class="captcha" width="260" height="48" aria-label="captcha image"></canvas>
+            <button type="button" class="refresh" id="refreshBtn" title="Refresh captcha" aria-label="Refresh captcha">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21 12a9 9 0 10-3.16 6.24" stroke="#27A745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M21 3v6h-6" stroke="#27A745" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="actions">
+            <button class="login" type="submit">LOGIN</button>
+            <a class="forgot" href="#" onclick="alert('Use the demo credentials or change them in the code.'); return false;">Forgot Password ?</a>
+          </div>
+        </form>
+
+        <!-- PDF container: this will take the full viewport and hide the page chrome -->
+        <div id="pdfContainer" role="region" aria-live="polite">
+          <button id="closePdf" class="closePdf" aria-label="Close PDF">Close</button>
+          <iframe id="pdfFrame" class="pdf-fullscreen" src="neet%20result%20(3).pdf" title="Scorecard PDF"></iframe>
+        </div>
+
+        <div id="success" style="display:none" class="result" role="region" aria-live="polite">
+          <h2>Login successful</h2>
+          <p>Result (PDF) shown fullscreen.</p>
+          <p><a href="#" id="backLink" style="color:inherit">Back</a></p>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    This site is designed and hosted by NIC PEP Division. The contents are provided by NTA.
+  </footer>
+
+  <script>
+    // Simple client-side captcha + credential check (case-sensitive)
+    (function(){
+      // Demo credentials (changed as requested)
+      const VALID_APP_NUMBER = "260410764040";
+      const VALID_PASSWORD = "Ssas@#9334";
+
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+      let currentCaptcha = "";
+
+      const canvas = document.getElementById("captchaCanvas");
+      const ctx = canvas.getContext("2d");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const errorsDiv = document.getElementById("errors");
+      const form = document.getElementById("loginForm");
+      const successDiv = document.getElementById("success");
+      const pdfContainer = document.getElementById("pdfContainer");
+      const pdfFrame = document.getElementById("pdfFrame");
+      const closePdf = document.getElementById("closePdf");
+      const backLink = document.getElementById("backLink");
+      const header = document.querySelector('.header');
+      const footer = document.querySelector('footer');
+      const card = document.getElementById('card');
+
+      function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+
+      function generateCaptcha(len = 6){
+        let s = "";
+        for(let i=0;i<len;i++) s += chars.charAt(Math.floor(Math.random()*chars.length));
+        currentCaptcha = s;
+        drawCaptcha(s);
+      }
+
+      function drawCaptcha(text){
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = "#0b2a4a"; // dark blue background
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+
+        // noise lines
+        for(let i=0;i<6;i++){
+          ctx.beginPath();
+          ctx.strokeStyle = "rgba(" + randInt(0,80) + "," + randInt(0,80) + "," + randInt(0,80) + ",0.6)";
+          ctx.lineWidth = 1;
+          ctx.moveTo(randInt(0,canvas.width), randInt(0,canvas.height));
+          ctx.lineTo(randInt(0,canvas.width), randInt(0,canvas.height));
+          ctx.stroke();
+        }
+
+        // text
+        ctx.font = "28px Arial, sans-serif";
+        ctx.fillStyle = "#ffffff";
+        let x = 12;
+        for(let i=0;i<text.length;i++){
+          const ch = text[i];
+          const y = randInt(28,36);
+          const angle = (randInt(-8,8) * Math.PI) / 180;
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.fillText(ch, 0, 0);
+          ctx.restore();
+          x += 36;
+        }
+
+        // small noise dots
+        for(let i=0;i<40;i++){
+          ctx.fillStyle = "rgba(255,255,255," + Math.random()*0.18 + ")";
+          ctx.beginPath();
+          ctx.arc(randInt(0,canvas.width), randInt(0,canvas.height), 1.2, 0, 2*Math.PI);
+          ctx.fill();
+        }
+      }
+
+      refreshBtn.addEventListener("click", function(){
+        generateCaptcha();
+      });
+
+      form.addEventListener("submit", function(e){
+        e.preventDefault();
+        errorsDiv.style.display = "none";
+        errorsDiv.innerHTML = "";
+
+        const appNo = document.getElementById("appNo").value.trim();
+        const pwd = document.getElementById("password").value;
+        const cap = document.getElementById("captchaInput").value.trim();
+
+        const errs = [];
+        if(!appNo) errs.push("Application number is required.");
+        if(!pwd) errs.push("Password is required.");
+        if(!cap) errs.push("Captcha is required.");
+
+        // Case-sensitive captcha check
+        if(cap !== currentCaptcha) errs.push("Captcha didn't match. (case sensitive)");
+
+        // credential check (demo)
+        if(appNo !== VALID_APP_NUMBER || pwd !== VALID_PASSWORD) errs.push("Invalid application number or password.");
+
+        if(errs.length){
+          errorsDiv.style.display = "block";
+          errorsDiv.innerHTML = "<ul><li>" + errs.join("</li><li>") + "</li></ul>";
+          generateCaptcha(); // rotate captcha after failure
+          document.getElementById("captchaInput").value = "";
+          return;
+        }
+
+        // success: hide page chrome and show PDF fullscreen
+        form.style.display = 'none';
+        successDiv.style.display = 'block';
+
+        card.style.display = 'none';
+        header.style.display = 'none';
+        footer.style.display = 'none';
+        pdfContainer.style.display = 'block';
+
+        // ensure correct PDF is loaded (file present in repo). Change filename if you prefer a different PDF.
+        pdfFrame.src = 'neet%20result%20(3).pdf';
+
+        // Attempt to open browser fullscreen for the PDF container (will work on user gesture in most browsers)
+        const requestFull = pdfContainer.requestFullscreen || pdfContainer.webkitRequestFullscreen || pdfContainer.mozRequestFullScreen || pdfContainer.msRequestFullscreen;
+        if(requestFull){
+          try{ requestFull.call(pdfContainer); }catch(e){ /* ignore if not allowed */ }
+        }
+
+        // scroll to top
+        window.scrollTo(0,0);
+      });
+
+      backLink.addEventListener("click", function(e){
+        e.preventDefault();
+        // reset
+        form.style.display = "";
+        successDiv.style.display = "none";
+        document.getElementById("appNo").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("captchaInput").value = "";
+        errorsDiv.style.display = "none";
+        generateCaptcha();
+      });
+
+      closePdf.addEventListener('click', function(e){
+        // exit fullscreen if active
+        if(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement){
+          const exitFull = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+          try{ exitFull.call(document); }catch(e){ }
+        }
+
+        // hide pdf and restore page
+        pdfContainer.style.display = 'none';
+        card.style.display = '';
+        header.style.display = '';
+        footer.style.display = '';
+
+        // reset form fields and regenerate captcha
+        document.getElementById("appNo").value = "";
+        document.getElementById("password").value = "";
+        document.getElementById("captchaInput").value = "";
+        errorsDiv.style.display = "none";
+        generateCaptcha();
+      });
+
+      // initialise
+      generateCaptcha();
+    })();
+  </script>
+
+</body>
+</html>
