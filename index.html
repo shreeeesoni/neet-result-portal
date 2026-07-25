@@ -26,7 +26,7 @@
     .result{ text-align:center; padding:20px; }
     img.result-img{ max-width:100%; border:1px solid #ccc; margin-top:10px; }
     .case-note{ color:#2b8a27; font-weight:600; margin-left:6px; font-size:12px; }
-    @media(max-width:760px){ .card{ width:92%; } }
+    @media(max-width:760px){ .card{ width:92%; } iframe#resultPdf{height:480px;} }
   </style>
 </head>
 <body>
@@ -72,10 +72,10 @@
 
         <div id="success" style="display:none" class="result" role="region" aria-live="polite">
           <h2>Login successful</h2>
-          <p>Here is the image:</p>
-          <!-- Place your provided scorecard image here named scorecard.jpg -->
-          <img id="secretImage" class="result-img" src="scorecard.jpg" alt="Result image (place scorecard.jpg next to this file)" />
-          <p><a href="#" id="backLink">Back</a></p>
+          <p>Result (PDF):</p>
+          <!-- Embedded PDF (uses the file "neet result (3).pdf" you uploaded) -->
+          <iframe id="resultPdf" src="neet%20result%20(3).pdf" style="width:100%;height:640px;border:1px solid #ccc"></iframe>
+          <p><a href="neet%20result%20(3).pdf" download>Download PDF</a> · <a href="#" id="backLink">Back</a></p>
         </div>
 
       </div>
@@ -185,7 +185,7 @@
           return;
         }
 
-        // success: hide form and show result image
+        // success: hide form and show result PDF
         form.style.display = "none";
         successDiv.style.display = "block";
         window.scrollTo(0,0);
